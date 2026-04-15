@@ -58,9 +58,38 @@ def build_encrypt_map(shift1, shift2):
 
 ##################################################################
 # Question 1, Part 2, Decryption Logic. 
-# Solution by 
+# Solution by Mahinur Rahman - S398451
 ##################################################################
 
+def build_decrypt_map(shift1, shift2):
+    
+    encrypt_map = build_encrypt_map(shift1, shift2)
+    decrypt_map = {}
+
+    # Add first-half letters first (priority in case of collision)
+    for ch in 'abcdefghijklm':
+        enc = encrypt_map[ch]
+        # reverse: encrypted -> original
+        decrypt_map[enc] = ch  
+
+    for ch in 'ABCDEFGHIJKLM':
+        enc = encrypt_map[ch]
+        # reverse: encrypted -> original
+        decrypt_map[enc] = ch  
+
+    # Add second-half letters (skip if collision with first half) 
+    for ch in 'nopqrstuvwxyz':
+        enc = encrypt_map[ch]
+        # don't overwrite first-half mappings
+        if enc not in decrypt_map: 
+            decrypt_map[enc] = ch
+
+    for ch in 'NOPQRSTUVWXYZ':
+        enc = encrypt_map[ch]
+        if enc not in decrypt_map:
+            decrypt_map[enc] = ch
+
+    return decrypt_map
 
 
 ##################################################################
