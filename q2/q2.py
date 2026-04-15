@@ -146,6 +146,106 @@ def format_tokens(tokens):
 # Solution by Tufayel Ahmed - S397780
 # Walks the parse tree and computes the numeric result.
 # =============================================================================
+def evaluate_tree(node):
+    """
+    Recursively evaluates a parse tree node and returns the numeric result.
+
+    Parameters:
+        node (dict): a parse tree node built by the Parser
+
+    Returns:
+        float: the computed result
+
+    Raises:
+        ZeroDivisionError: if division by zero is detected
+        ValueError: if an unknown node type is encountered
+    """
+    # Base case: number literal
+    if node['type'] == 'num':
+        return node['value']
+
+    # Unary negation
+    if node['type'] == 'neg':
+        return -evaluate_tree(node['operand'])
+
+    # Binary operation
+    if node['type'] == 'binop':
+        left  = evaluate_tree(node['left'])
+        right = evaluate_tree(node['right'])
+        op    = node['op']
+
+        if op == '+': return left + right
+        if op == '-': return left - right
+        if op == '*': return left * right
+        if op == '/':
+            if right == 0:
+                raise ZeroDivisionError("Division by zero")
+            return left / right
+
+    raise ValueError(f"Unknown node type: {node['type']}")
+
+
+def format_result(value):
+    """
+    Formats a numeric result for output.
+    - If the result is a whole number (e.g. 8.0), display without decimal (e.g. 8)
+    - Otherwise, round to 4 decimal places
+
+    Parameters:
+        value (float): the computed result
+
+    Returns:
+        str: formatted result string
+    """
+    if value == int(value):
+        return str(int(value))
+    return str(round(value, 4))
+
+
+def process_expression(expression):
+    """
+    Processes a single expression string end-to-end:
+        tokenize → parse → evaluate
+
+    Parameters:
+        expression (str): one line from the input file
+
+    Returns:
+        dict with keys: 'input', 'tree', 'tokens', 'result'
+        On any error, 'tree', 'tokens', and 'result' are set to "ERROR"
+    """
+    result = {
+        'input':  expression,
+        'tree':   'ERROR',
+        'tokens': 'ERROR',
+        'result': 'ERROR'
+    }
+
+    try:
+        # Step 1: Tokenize
+        tokens = tokenize(expression)
+        result['tokens'] = format_tokens(tokens)
+
+        # Step 2: Parse into tree
+        parser = Parser(tokens)
+        tree = parser.parse()
+        result['tree'] = tree_to_string(tree)
+
+        # Step 3: Evaluate
+        value = evaluate_tree(tree)
+        result['result'] = format_result(value)
+
+    except ZeroDivisionError:
+        # Division by zero — tree and tokens may already be set
+        result['result'] = 'ERROR'
+
+    except ValueError:
+        # Tokenizer or parser error — reset all to ERROR
+        result['tree']   = 'ERROR'
+        result['tokens'] = 'ERROR'
+        result['result'] = 'ERROR'
+
+    return result
 
 
 
