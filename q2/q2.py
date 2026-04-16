@@ -140,6 +140,163 @@ def format_tokens(tokens):
 # Each node is a dict: {'type': ..., ...}
 # =============================================================================
 
+class Parser:
+    """
+    Recursive descent parser that builds a parse tree from a token list.
+
+    The grammar enforces operator precedence:
+        expression -> term (('+' | '-') term)*
+        term       -> unary (('*' | '/') unary)*
+        unary      -> '-' unary | primary
+        primary    -> NUM | '(' expression ')'
+
+    The parse tree uses plain dicts (no classes):
+        Number node:  {'type': 'num',    'value': float}
+        Binary node:  {'type': 'binop',  'op': str, 'left': node, 'right': node}
+        Unary node:   {'type': 'neg',    'operand': node}
+    """
+
+    def __init__(self, tokens):
+        self.tokens = tokens  # full list of tokens
+        self.pos = 0          # current position in token list
+
+    def current(self):
+        """Returns the current token without consuming it."""
+        return self.tokens[self.pos]
+
+    def consume(self):
+        """Returns the current token and advances position."""
+        tok = self.tokens[self.pos]
+        self.pos += 1
+        return tok
+
+    def expect(self, token_type):
+        """
+        Consumes the current token if it matches the expected type.
+        Raises ValueError if it doesn't match.
+        """
+        tok = self.consume()
+        if tok['type'] != token_type:
+            raise ValueError(f"Expected {token_type}, got {tok['type']}:{tok['value']}")
+        return tok
+
+    def parse(self):
+        """
+        Entry point. Parses a full expression and checks nothing is left over.
+
+        Returns:
+            dict: root node of the parse tree
+
+        Raises:
+            ValueError: on syntax error
+        """
+        node = self.parse_expression()
+        # After parsing, we should be at END
+        if self.current()['type'] != 'END':
+            raise ValueError(f"Unexpected token: {self.current()['value']}")
+        return node
+
+    def parse_expression(self):
+        """
+        Handles + and - (lowest precedence, left-to-right).
+        expression → term (('+' | '-') term)*
+        """
+        left = self.parse_term()
+
+        while self.current()['type'] == 'OP' and self.current()['value'] in ('+', '-'):
+            op = self.consume()['value']
+            right = self.parse_term()
+            left = {'type': 'binop', 'op': op, 'left': left, 'right': right}
+
+        return left
+
+    def parse_term(self):
+        """
+        Handles * and / (higher precedence, left-to-right).
+        term → unary (('*' | '/') unary)*
+        """
+        left = self.parse_unary()
+
+        while self.current()['type'] == 'OP' and self.current()['value'] in ('*', '/'):
+            op = self.consume()['value']
+            right = self.parse_unary()
+            left = {'type': 'binop', 'op': op, 'left': left, 'right': right}
+
+        return left
+
+    def parse_unary(self):
+        """
+        Handles unary negation (-) recursively.
+        unary → '-' unary | primary
+
+        Unary + is NOT supported and raises an error.
+        """
+        tok = self.current()
+
+        # Unary negation: - followed by another unary or primary
+        if tok['type'] == 'OP' and tok['value'] == '-':
+            self.consume()  # eat the '-'
+            operand = self.parse_unary()
+            return {'type': 'neg', 'operand': operand}
+
+        # Unary + is not supported
+        if tok['type'] == 'OP' and tok['value'] == '+':
+            raise ValueError("Unary '+' is not supported")
+
+        return self.parse_primary()
+
+    def parse_primary(self):
+        """
+        Handles numbers and parenthesised sub-expressions.
+        primary → NUM | '(' expression ')'
+        """
+        tok = self.current()
+
+        # Number literal
+        if tok['type'] == 'NUM':
+            self.consume()
+            return {'type': 'num', 'value': tok['value']}
+
+        # Parenthesised expression
+        if tok['type'] == 'LPAREN':
+            self.consume()  # eat '('
+            node = self.parse_expression()
+            # must close with ')'
+            self.expect('RPAREN') 
+            return node
+
+        raise ValueError(f"Unexpected token in expression: {tok['type']}:{tok['value']}")
+
+
+def tree_to_string(node):
+    """
+    Converts a parse tree node to its prefix string representation.
+
+    Examples:
+        num node  → "3"
+        binop     → "(+ 3 5)"
+        neg       → "(neg 5)"
+
+    Parameters:
+        node (dict): a parse tree node
+
+    Returns:
+        str: prefix notation string
+    """
+    if node['type'] == 'num':
+        val = node['value']
+        return str(int(val)) if val == int(val) else str(val)
+
+    if node['type'] == 'binop':
+        left = tree_to_string(node['left'])
+        right = tree_to_string(node['right'])
+        return f"({node['op']} {left} {right})"
+
+    if node['type'] == 'neg':
+        operand = tree_to_string(node['operand'])
+        return f"(neg {operand})"
+
+    raise ValueError(f"Unknown node type: {node['type']}")
 
 # =============================================================================
 # Question 2, PART 3 - Evaluator
